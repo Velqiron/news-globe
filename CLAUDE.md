@@ -7,6 +7,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - **このリポジトリの `news-globe.html` が正本。** ローカルのファイルはアップロードしない。修正はすべてこのファイルに直接加える。
 - 元のソースやビルド設定はリポジトリにない。修正は圧縮済みのコードを直接書き換える。
 - 修正 → テスト → PR 作成 → **確認なしで `main` にマージしてよい**（オーナー了承済み）。
+- **API キーを公開ページに載せない**（オーナー方針）。キーが必要なサービス（Google Cloud Translation、DeepL など）は使わない。使う場合は中継サーバーを別に用意する。
 - ユーザーへの報告は日本語で行う。
 
 ## ファイル構成
@@ -31,6 +32,13 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 4. **構文チェック**: `node -e "const s=require('fs').readFileSync('news-globe.html','utf8');const i=s.lastIndexOf('<script>')+8;new Function(s.slice(i,s.indexOf('</script>',i)))"`
 5. UI の文字列は `"キー":"\uXXXX…"` 形式の辞書にある（例: `wn.title`、`tr.waiting`）。日本語は `\u` でエスケープされているので、検索するときもエスケープした形で探す。
 
+## 主要メディア・現地メディア（ニュースタブの「世界の報道」）
+- `ngMajorByCC`（`async function ba` の直前）が主要メディアの一覧。キーは媒体の本拠地の国コード（ISO 3166-1 alpha-2）、値は空白区切りのドメイン。選定基準は「国際通信社・公共放送・主要な全国紙」。追加・削除はここを編集する（サブドメインは親ドメインで一致する。例: `asia.nikkei.com` → `nikkei.com`）。
+- 「主要メディア」の記事を一覧の上に並べる。「現地メディア」は GDELT の `sourcecountry` か国別ドメイン（ccTLD）が選んだ国と一致する記事に付ける（`ngIsLocal`、国名の表記ゆれは `ngAlias`）。現地メディアは印を付けるだけで、並び順は変えない。
+- 主要メディアが3件未満のときだけ、`domain:` で主要メディアに絞った GDELT 検索を1回追加する（`ngMore`）。対象は BBC・Reuters・AP と、その国の媒体（なければ DW・France 24・NHK・ABC）の計8件まで。GDELT は IP ごとに「5秒に1回」の制限があり、アプリ側で6秒間隔にしている（`Kp`）。
+- 表示の文言は各言語の辞書の `src.major` / `src.local` / `src.legend` / `src.searching`。
+- GDELT の利用条件として、出典表記と https://www.gdeltproject.org/ へのリンクが必要（一覧の注記と「データと出典」に設置済み）。
+
 ## 動作確認
 - クラウド環境からは外部の API に接続できないことが多い。Playwright（`/opt/pw-browsers/chromium`、`NODE_PATH=$(npm root -g)`）で `file://` として開き、`context.route()` で通信を模擬する。
 - 起動: `chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })`、`locale: 'ja-JP'`。
@@ -42,3 +50,4 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - #1: 内蔵翻訳（Translator API）が止まるとニュースが「翻訳待ち」のままになる → 準備完了の判定を厳密にし、待ち時間の上限と MyMemory への切り替えを追加。
 - #2: 自転中は「今日の世界ニュース」の取得が始まらない（`requestIdleCallback` に上限がなかった） → 上限1秒を指定し、起動直後に取得を開始。取得は2日分だけにし、失敗時は再試行する。
 - #4: 「国・経済」タブの経済指標が「接続できませんでした」になることがある（7指標を `;` でまとめた World Bank API のリクエストが、経路によってはブラウザからだけ 403 になる） → まとめ取りに失敗したら指標ごとに取得し直して結果を合わせる（`wbFetchEach`）。
+- #5: GDELT の「世界の報道」に「主要メディア」「現地メディア」の印を付け、主要メディアを上に表示。主要メディアが少ないときは主要メディアに絞った検索を追加。gdeltproject.org へのリンクを追加。
