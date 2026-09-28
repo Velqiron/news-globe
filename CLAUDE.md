@@ -1,6 +1,6 @@
 # News Globe（ニュース地球儀）
 
-3D の地球儀をクリックすると、その場所の概要・ニュース・天気・経済データを10言語で表示する Web アプリ。
+3D の地球儀をクリックすると、その場所の概要・ニュース・天気・経済データを12言語で表示する Web アプリ。
 GitHub Pages で `news-globe.html` をそのまま公開している（https://velqiron.github.io/news-globe/news-globe.html）。
 
 ## 運用方針
@@ -57,3 +57,4 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - #9: ニュースタブ上部の翻訳状態の欄を削除。正常時（`describe()` の tone が ok で操作なし）は何も出さず、再試行・有効化などの操作が必要なときだけ、タブ列の右端（`.tr-mini`）に点とボタンを小さく出す。詳しい文面はマウスを乗せたときの表示（title）。
 - #10: 訳文をブラウザに保存して再利用（`trCacheLoad` / `trCacheSave`、localStorage の `newsglobe:tr-cache`）。キーは「表示言語・元の言語・原文」。14日で期限切れ、最新2,000件まで、容量不足なら件数を半分ずつ減らして保存。MyMemory で訳した文は、内蔵翻訳が使えるときは訳し直す。MyMemory の枠を使い切った／残り1,500文字未満でメール未設定のときは、タブ列の右端に「メールで上限を増やす」を出し、設定画面のメール欄を開く（`trEmailCta`）。メール設定時に使い切りの状態を解除。
 - #11: 表示言語を自分で選んだとき、または表示言語がブラウザの第一言語と同じときは、`<html translate="no">` にしてブラウザ（Chrome）の自動ページ翻訳を止める（`kd()`）。日本語の人が English を選ぶと Chrome が英語 UI を日本語に機械翻訳し、表示が混在していたため。タイ語・ベトナム語など未対応言語の人（英語表示に自動フォールバック）は翻訳を許可したままにし、Chrome の翻訳で読めるようにしている。
+- #12: 表示言語にタイ語（th）とベトナム語（vi）を追加（辞書 `ngDictTh` / `ngDictVi`、言語一覧 `kc`、`Ha`、地域設定 `pg`（タイ語は西暦表示の `th-TH-u-ca-gregory`）、Google ニュース `wm`、集落判定 `Qb`、CSP に th/vi.wikipedia.org）。ベトナム語の都市・州県・海域名は Natural Earth の NAME_VI を `d-names` に追加（既存の中国語名と照合して対応づけを検証）。Natural Earth にタイ語名はないため、タイ語では都市・州県・海域名は英語、国名はブラウザの Intl.DisplayNames でタイ語。タブ名が折り返さないよう `.tab` に `white-space:nowrap`。
