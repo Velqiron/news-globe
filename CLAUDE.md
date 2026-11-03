@@ -11,7 +11,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - ユーザーへの報告は日本語で行う。
 
 ## ファイル構成
-- `news-globe.html`（約8.7MB・1ファイル完結）
+- `news-globe.html`（約9MB・1ファイル完結）
   - `<script type="application/json" id="d-countries">` などに、国・州・海域・地名のデータとテクスチャを埋め込んでいる。
   - 本体のコードは最後の `<script>`（圧縮済み）。three.js 0.186.0 と d3-geo 3.1.1 を同梱。
   - 実行時に呼び出す外部サービス: Wikipedia / Wikidata / Open-Meteo / World Bank / USGS / GDELT / MyMemory / NASA GIBS。
