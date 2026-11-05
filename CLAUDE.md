@@ -15,7 +15,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
   - `<script type="application/json" id="d-countries">` などに、国・州・海域・地名のデータとテクスチャを埋め込んでいる。
   - 本体のコードは最後の `<script>`（圧縮済み）。three.js 0.186.0 と d3-geo 3.1.1 を同梱。
   - 実行時に呼び出す外部サービス: Wikipedia / Wikidata / Open-Meteo / World Bank / USGS / MyMemory / NASA GIBS と、ニュースの JSON（raw.githubusercontent.com）。
-- `tools/feeds.json`・`tools/fetch_news.py`・`.github/workflows/news-feed.yml`: ニュースの収集（下記）。
+- `tools/feeds.json`・`tools/fetch_news.py`・`tools/requirements.txt`・`.github/workflows/news-feed.yml`: ニュースの収集（下記）。
 - `LICENSE`: 独自ライセンス（All rights reserved）と、同梱ライブラリのライセンス表記。
 
 ## 編集時の注意
@@ -46,6 +46,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - 取得する RSS は `tools/feeds.json`（`lang` は記事の言語、`country` は媒体の本拠地の英語名、`home` は国内向け媒体の国コード）。追加・削除はここを編集し、Actions の「news-feed」を手動実行してログの OK/NG で確認する。
 - `fetch_news.py` が記事に国コード（`cc`。CLDR の12言語の国名・アプリ内の英語の別名表 `qb`）と英語の都市名（`k`。人口100万以上の都市、地名データ `d-places`/`d-names`）を付ける。国名が出てこない国内向け媒体の記事は `home` の国とみなす。
 - アプリ側（`Kp`）は GDELT 形式の検索語（`(A OR "B C") (業種語…)`、`domain:`）を解釈して `news.json` を検索し、GDELT と同じ形の結果を返す。1つ目の括弧（地名）は見出し・要約・`k` との一致、国全体の検索では `cc` との一致でも可（`wnNewsCC`）。業種語は英語の語に加えて12言語の業種語（`wnIndL10n`）でも照合する（`wnIndExpand`）。日本語・中国語・タイ語・韓国語は部分一致、それ以外は語の境界で一致。
+- ワークフローの権限（サイト本体の改ざんを防ぐ）: 外部の RSS を処理する `fetch` ジョブは `contents: read` のみで、checkout の資格情報も残さない（`persist-credentials: false`）。書き込み権限は `publish` ジョブだけで、そこでは成果物の受け取り・形の確認・`git push` しかしない。actions はコミットの SHA で固定（コメントに版を併記）、babel は `tools/requirements.txt` のハッシュで固定。版を上げるときは、actions は公式リポジトリのタグが指す SHA（`git ls-remote --tags https://github.com/actions/<名前>`）に、babel は PyPI の sha256 に書き換える。ワークフローの全体の既定は `permissions: {}`。新しいステップを足すときも、外部のコードやデータを扱う処理は `publish` に入れない。
 - 注意: 公開リポジトリで60日間活動がないと、定期実行のワークフローは GitHub により自動で無効化される（Actions 自身の push が活動に数えられるかは要確認）。止まったら Actions の画面で有効化し直す。
 
 ## 動作確認
@@ -95,4 +96,5 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
   9. 近くの主な都市で距離がほぼ0のとき「北 0 m」と方角が出ていた → 50 m 未満は方角を出さない。
   - 点検時の観察: 当日は GDELT が 503、世界銀行 API も 503 や時間切れが多く、GDELT の記事も数日遅れていた（外部サービス側の状態）。点検環境（GPU なしのソフトウェア描画）では、外部停止時にラベルのクリックが長押し扱いになることがあるが、WebGL の画面の読み戻しによる環境由来でアプリの不具合ではない。並列で動かすと検索欄の Enter が効かないことがあったのは 4. が原因。
 - #27: 「世界の報道」の取得元を GDELT から各社 RSS（GitHub Actions で収集した `news.json`）に置き換えた。上記「ニュースの収集」を参照。CSP の `connect-src` は `api.gdeltproject.org` を `raw.githubusercontent.com` に変更。12言語の文言（`gdelt.*`・`set.span`・`intro.srcs`・`cr.gdeltT`）から GDELT の名前を外した（辞書のキー名は `gdelt.*` のまま）。
+- #30（セキュリティ点検 2026-11）: アプリ本体に穴はなし（`innerHTML` 等の HTML 挿入が0件、URL は http(s) のみ、CSP はハッシュ限定。悪意ある news.json を流し込んでも文字として表示されることを Playwright で確認）。一方で news-feed ワークフローが侵害されると `main` の `news-globe.html` を書き換えられる経路があった（全体に `contents: write`、資格情報が残った状態で外部 RSS を処理、actions はタグ指定、pip はハッシュ未固定、`main` は保護なし）→ 上記「ワークフローの権限」の構成に変更。checkout の `ref: main` もやめ、起動したブランチのコードで動かす（定期実行は main なので同じ）。ブランチ上の手動実行で fetch が `Contents: read`、publish が `Contents: write` になり `news-data` が更新されることを確認。
 - 総点検の道具: 作業用の Playwright スクリプト（全 API を模擬し、各タブ・設定・データと出典を開いて、画面上の未翻訳キー・undefined/NaN・未置換の {name}・右端のはみ出し・スクリプトエラーを検出する）。リポジトリには含めていない。
