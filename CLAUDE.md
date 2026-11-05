@@ -14,7 +14,8 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - `news-globe.html`（約9MB・1ファイル完結）
   - `<script type="application/json" id="d-countries">` などに、国・州・海域・地名のデータとテクスチャを埋め込んでいる。
   - 本体のコードは最後の `<script>`（圧縮済み）。three.js 0.186.0 と d3-geo 3.1.1 を同梱。
-  - 実行時に呼び出す外部サービス: Wikipedia / Wikidata / Open-Meteo / World Bank / USGS / GDELT / MyMemory / NASA GIBS。
+  - 実行時に呼び出す外部サービス: Wikipedia / Wikidata / Open-Meteo / World Bank / USGS / MyMemory / NASA GIBS と、ニュースの JSON（raw.githubusercontent.com）。
+- `tools/feeds.json`・`tools/fetch_news.py`・`.github/workflows/news-feed.yml`: ニュースの収集（下記）。
 - `LICENSE`: 独自ライセンス（All rights reserved）と、同梱ライブラリのライセンス表記。
 
 ## 編集時の注意
@@ -34,10 +35,18 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 
 ## 主要メディア・現地メディア（ニュースタブの「世界の報道」）
 - `ngMajorByCC`（`async function ba` の直前）が主要メディアの一覧。キーは媒体の本拠地の国コード（ISO 3166-1 alpha-2）、値は空白区切りのドメイン。選定基準は「国際通信社・公共放送・主要な全国紙」。追加・削除はここを編集する（サブドメインは親ドメインで一致する。例: `asia.nikkei.com` → `nikkei.com`）。
-- 「主要メディア」の記事を一覧の上に並べる。「現地メディア」は GDELT の `sourcecountry` か国別ドメイン（ccTLD）が選んだ国と一致する記事に付ける（`ngIsLocal`、国名の表記ゆれは `ngAlias`）。現地メディアは印を付けるだけで、並び順は変えない。
-- 主要メディアが3件未満のときだけ、`domain:` で主要メディアに絞った GDELT 検索を1回追加する（`ngMore`）。対象は BBC・Reuters・AP と、その国の媒体（なければ DW・France 24・NHK・ABC）の計8件まで。GDELT は IP ごとに「5秒に1回」の制限があり、アプリ側で6秒間隔にしている（`Kp`）。
+- 「主要メディア」の記事を一覧の上に並べる。「現地メディア」は記事の発信国（feeds.json の `country`）か国別ドメイン（ccTLD）が選んだ国と一致する記事に付ける（`ngIsLocal`、国名の表記ゆれは `ngAlias`）。現地メディアは印を付けるだけで、並び順は変えない。
+- 主要メディアが3件未満のときだけ、`domain:` で主要メディアに絞った検索を1回追加する（`ngMore`）。対象は BBC・Reuters・AP と、その国の媒体（なければ DW・France 24・NHK・ABC）の計8件まで。
 - 表示の文言は各言語の辞書の `src.major` / `src.local` / `src.legend` / `src.searching`。
-- GDELT の利用条件として、出典表記と https://www.gdeltproject.org/ へのリンクが必要（一覧の注記と「データと出典」に設置済み）。
+- 出典は「報道各社の RSS」と表示し、`tools/feeds.json` へのリンクを置く（一覧の注記と「データと出典」）。
+
+## ニュースの収集（2026-11 に GDELT から置き換え）
+- GDELT はブラウザから一度も安定して取得できなかったため廃止。API キー不要の各社 RSS を GitHub Actions で1時間ごと（毎時17分）に取得し、`news-data` ブランチの `news.json` に置く。アプリは `https://raw.githubusercontent.com/velqiron/news-globe/news-data/news.json` を読む（CORS 許可・5分キャッシュを確認済み）。
+- `news-data` は履歴を持たない1コミットのブランチで、毎回作り直して強制 push する（リポジトリが肥大しないように）。直前の `news.json` を引き継ぎ、7日分・最大4,000件を保持。全フィードが失敗したときは上書きしない。
+- 取得する RSS は `tools/feeds.json`（`lang` は記事の言語、`country` は媒体の本拠地の英語名、`home` は国内向け媒体の国コード）。追加・削除はここを編集し、Actions の「news-feed」を手動実行してログの OK/NG で確認する。
+- `fetch_news.py` が記事に国コード（`cc`。CLDR の12言語の国名・アプリ内の英語の別名表 `qb`）と英語の都市名（`k`。人口100万以上の都市、地名データ `d-places`/`d-names`）を付ける。国名が出てこない国内向け媒体の記事は `home` の国とみなす。
+- アプリ側（`Kp`）は GDELT 形式の検索語（`(A OR "B C") (業種語…)`、`domain:`）を解釈して `news.json` を検索し、GDELT と同じ形の結果を返す。1つ目の括弧（地名）は見出し・要約・`k` との一致、国全体の検索では `cc` との一致でも可（`wnNewsCC`）。業種語は英語の語に加えて12言語の業種語（`wnIndL10n`）でも照合する（`wnIndExpand`）。日本語・中国語・タイ語・韓国語は部分一致、それ以外は語の境界で一致。
+- 注意: 公開リポジトリで60日間活動がないと、定期実行のワークフローは GitHub により自動で無効化される（Actions 自身の push が活動に数えられるかは要確認）。止まったら Actions の画面で有効化し直す。
 
 ## 動作確認
 - クラウド環境からは外部の API に接続できないことが多い。Playwright（`/opt/pw-browsers/chromium`、`NODE_PATH=$(npm root -g)`）で `file://` として開き、`context.route()` で通信を模擬する。
@@ -71,7 +80,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - #23: 業種で絞ると関係ない投稿が多い（X の長文投稿・X の記事機能に、地名と業種の語がたまたま両方入っているだけのものが上位に並ぶ。`filter:links` / `-filter:replies` では変わらず、`filter:news` は X がエラーを返した）への対策。
   - X: 地名ラベル・ピンの英語名を保持し（ラベルの `wnEn`、カードの `L.en`）、「最新」を「(地名 OR 英語名)」で検索（`wnPlaceQ`。同じ名前なら付けない）。業種を選んだときは「最新」ボタンを「報道」（`wnIndL10n` の `press` / `ptip`）に替え、報道機関の X アカウントに限定（`wnPressQ`、末尾に `(from:… OR …)`）。アカウントは `wnPressAcc`（共通10件＋表示言語ごとの2〜5件）。追加するときは X 上で実在と認証マークを確認する（ベトナム語は認証付きが見つからず、公式サイトへのリンクがある VietnamNewsVNS のみ）。「話題」と Bluesky は従来どおり。
   - 世界の報道（GDELT）: 業種を選ぶと検索語に英語の業種語を AND で加える（`wnNewsQ`。GDELT は他言語の記事も英語の機械翻訳で照合する）。業種を選んでいるときの期間は設定によらず7日（`wnNewsSpan`。記事が少なくなるため）。「世界の報道」の見出しの下に業種のプルダウン（`wnNewsInd`、`.ng-ind-row`）。選択はカードと共通（localStorage の `newsglobe:xl-ind`）で、カード側で変えても表示中のニュースを取り直す。0件のときは「すべての業種で見る」（`seeAll`）。
-  - GDELT は1つの IP から短い間隔で呼ぶと 429 になり、しばらく解除されない。実データでの確認は間隔を十分あけて1回ずつ行う（アプリを開くだけでも GDELT を呼ぶ）。
+  - （#27 で GDELT は廃止）GDELT は1つの IP から短い間隔で呼ぶと 429 になり、しばらく解除されなかった。
 - #24: 「報道」がチェコ × IT などで0件になる（X の「No results for …」。Edge の自動翻訳で「from:」が「出自:」などに訳されて表示されるが、検索語自体は正しい）。地名の英語名が「Czechia」で、報道機関は「Czech」「Czech Republic」と書くため一致しなかった → 「報道」の地名に、国は既存の別名表 `qb`（国コード別の英語の別名・形容詞。CZ→Czech など）を、さらに選択中の場所の Wikidata 由来の英語名（`Tt.names` の country / city / sea。ラベルの英語名と一致するものがあるときだけ）を OR で加える（`wnPressPlace`・`wnPlaceAlt`、最大6語）。国ラベルとピンに国コード（`wnA2` / `a2`）と種類を持たせた。Wikidata の名前は後から届くので、「報道」のリンクはクリック時にも作り直す。「最新」（業種なし）は従来どおり地名＋英語名のみ。
 - #25: 「報道」の0件を減らす（利用者の操作を増やさない方針）。X の検索は語の完全一致で、「retail」では「retailer」が拾えないため、「報道」の英語の業種語だけを見出しでよく使う形まで広げた（`wnPressKw`。例: retail → retailer(s)・supermarket(s)・e-commerce、IT → tech・startup(s)）。報道機関に限った検索なので語を広げても関係ない投稿は増えにくい。ただし「bank」は「West Bank」に当たるため使わない（banks・lender・central bank）。ニュースタブ（GDELT）の語 `wnIndEnKw` は変えていない。ハイフンを含む語も引用符で囲む（`wnIndQt`）。X は同じ検索でも一時的に「No results」を返すことがある（開き直すと出た）。約410文字の検索語でも動作を確認済み。
 - #26（総点検 2026-10）: 静的点検（12言語の辞書334項目の抜け・置換記号の不一致なし、ESLint の no-undef はアプリ本体で0件、通信先はすべて CSP で許可済み）と、12言語×（通常／外部サービス全停止／スマホ幅）の自動点検、公開版の実操作で見つかった不具合を修正。
@@ -85,4 +94,5 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
   8. Wikinews は2026年5月4日から読み取り専用（新しい記事が増えない）→ ニュースタブの「Wikinews で新しい順に検索」リンクを削除（辞書の `links.wikinews` は残置）。
   9. 近くの主な都市で距離がほぼ0のとき「北 0 m」と方角が出ていた → 50 m 未満は方角を出さない。
   - 点検時の観察: 当日は GDELT が 503、世界銀行 API も 503 や時間切れが多く、GDELT の記事も数日遅れていた（外部サービス側の状態）。点検環境（GPU なしのソフトウェア描画）では、外部停止時にラベルのクリックが長押し扱いになることがあるが、WebGL の画面の読み戻しによる環境由来でアプリの不具合ではない。並列で動かすと検索欄の Enter が効かないことがあったのは 4. が原因。
+- #27: 「世界の報道」の取得元を GDELT から各社 RSS（GitHub Actions で収集した `news.json`）に置き換えた。上記「ニュースの収集」を参照。CSP の `connect-src` は `api.gdeltproject.org` を `raw.githubusercontent.com` に変更。12言語の文言（`gdelt.*`・`set.span`・`intro.srcs`・`cr.gdeltT`）から GDELT の名前を外した（辞書のキー名は `gdelt.*` のまま）。
 - 総点検の道具: 作業用の Playwright スクリプト（全 API を模擬し、各タブ・設定・データと出典を開いて、画面上の未翻訳キー・undefined/NaN・未置換の {name}・右端のはみ出し・スクリプトエラーを検出する）。リポジトリには含めていない。

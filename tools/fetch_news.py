@@ -188,6 +188,9 @@ def main():
                     d = now
                 summ = summ[:SUMMARY_LEN]
                 ccs, ks = tag(f"{title} {summ}", f["lang"])
+                # 国内向けの媒体（feeds.json の home）で国名が出てこない記事は、その国の記事とみなす
+                if not ccs and f.get("home"):
+                    ccs = [f["home"]]
                 host = urlsplit(url).hostname or ""
                 items[url] = {"t": title, "s": summ, "u": url,
                               "d": host[4:] if host.startswith("www.") else host,
