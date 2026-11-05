@@ -1,0 +1,5 @@
+# fetch_news.py の依存。GitHub Actions では --require-hashes で、ハッシュが一致するときだけインストールする。
+# 版を上げるときは PyPI のその版の「Download files」で sha256 を確認して両方の行を書き換える。
+babel==2.18.0 \
+    --hash=sha256:e2b422b277c2b9a9630c1d7903c2a00d0830c409c59ac8cae9081c92f1aeba35 \
+    --hash=sha256:b80b99a14bd085fcacfa15c9165f651fbb3406e66cc603abf11c5750937c992d

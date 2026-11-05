@@ -1,6 +1,12 @@
 # 各社の RSS を1時間ごとに取得し、news.json を news-data ブランチに置く。
 # アプリは https://raw.githubusercontent.com/velqiron/news-globe/news-data/news.json を読む。
 # news-data は履歴を持たない1コミットだけのブランチ（毎回作り直して強制 push）。
+#
+# セキュリティ上の構成（サイト本体の改ざんを防ぐため）:
+# - 外部の RSS を処理する fetch ジョブは読み取り権限だけ。資格情報も残さない。
+# - 書き込み権限は publish ジョブだけに付け、そこでは外部のコードを動かさない（成果物の受け取りと git push のみ）。
+# - actions はタグではなくコミットの SHA で固定（タグの付け替えによる乗っ取りを防ぐ）。
+# - babel は tools/requirements.txt のハッシュと一致するときだけインストールする。
 name: news-feed
 
 on:
@@ -8,8 +14,7 @@ on:
     - cron: "17 * * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: news-feed
@@ -19,17 +24,21 @@ jobs:
   fetch:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    permissions:
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           ref: main
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
         with:
           python-version: "3.12"
 
       - name: Install babel (country names in 12 languages)
-        run: pip install babel==2.18.0
+        run: |
+          pip install --require-hashes --only-binary=:all: -r tools/requirements.txt
 
       - name: Get previous news.json
         run: |
@@ -39,13 +48,46 @@ jobs:
       - name: Fetch feeds
         run: python3 tools/fetch_news.py --feeds tools/feeds.json --html news-globe.html --prev out/prev.json --out out/news.json
 
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: news-json
+          path: out/news.json
+          if-no-files-found: error
+          retention-days: 1
+
+  publish:
+    needs: fetch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: news-json
+          path: out
+
+      - name: Check news.json
+        run: |
+          python3 -I - <<'EOF'
+          import json, os, sys
+          p = "out/news.json"
+          if os.path.getsize(p) > 20_000_000:
+              sys.exit("news.json is too large")
+          d = json.load(open(p, encoding="utf-8"))
+          if not isinstance(d, dict) or not isinstance(d.get("items"), list):
+              sys.exit("news.json has an unexpected shape")
+          print("items", len(d["items"]))
+          EOF
+
       - name: Publish to news-data branch
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd out
-          rm -f prev.json
           git init -q -b news-data
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add news.json
           git commit -q -m "news.json $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${GITHUB_REPOSITORY}.git" news-data
+          git push -q -f "https://x-access-token:${TOKEN}@github.com/${GITHUB_REPOSITORY}.git" news-data

@@ -15,7 +15,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
   - `<script type="application/json" id="d-countries">` などに、国・州・海域・地名のデータとテクスチャを埋め込んでいる。
   - 本体のコードは最後の `<script>`（圧縮済み）。three.js 0.186.0 と d3-geo 3.1.1 を同梱。
   - 実行時に呼び出す外部サービス: Wikipedia / Wikidata / Open-Meteo / World Bank / USGS / MyMemory / NASA GIBS と、ニュースの JSON（raw.githubusercontent.com）。
-- `tools/feeds.json`・`tools/fetch_news.py`・`.github/workflows/news-feed.yml`: ニュースの収集（下記）。
+- `tools/feeds.json`・`tools/fetch_news.py`・`tools/requirements.txt`・`.github/workflows/news-feed.yml`: ニュースの収集（下記）。
 - `LICENSE`: 独自ライセンス（All rights reserved）と、同梱ライブラリのライセンス表記。
 
 ## 編集時の注意
@@ -46,6 +46,7 @@ GitHub Pages で `news-globe.html` をそのまま公開している（https://v
 - 取得する RSS は `tools/feeds.json`（`lang` は記事の言語、`country` は媒体の本拠地の英語名、`home` は国内向け媒体の国コード）。追加・削除はここを編集し、Actions の「news-feed」を手動実行してログの OK/NG で確認する。
 - `fetch_news.py` が記事に国コード（`cc`。CLDR の12言語の国名・アプリ内の英語の別名表 `qb`）と英語の都市名（`k`。人口100万以上の都市、地名データ `d-places`/`d-names`）を付ける。国名が出てこない国内向け媒体の記事は `home` の国とみなす。
 - アプリ側（`Kp`）は GDELT 形式の検索語（`(A OR "B C") (業種語…)`、`domain:`）を解釈して `news.json` を検索し、GDELT と同じ形の結果を返す。1つ目の括弧（地名）は見出し・要約・`k` との一致、国全体の検索では `cc` との一致でも可（`wnNewsCC`）。業種語は英語の語に加えて12言語の業種語（`wnIndL10n`）でも照合する（`wnIndExpand`）。日本語・中国語・タイ語・韓国語は部分一致、それ以外は語の境界で一致。
+- ワークフローの権限（サイト本体の改ざんを防ぐ）: 外部の RSS を処理する `fetch` ジョブは `contents: read` のみで、checkout の資格情報も残さない（`persist-credentials: false`）。書き込み権限は `publish` ジョブだけで、そこでは成果物の受け取り・形の確認・`git push` しかしない。actions はコミットの SHA で固定（コメントに版を併記）、babel は `tools/requirements.txt` のハッシュで固定。版を上げるときは、actions は公式リポジトリのタグが指す SHA（`git ls-remote --tags https://github.com/actions/<名前>`）に、babel は PyPI の sha256 に書き換える。ワークフローの全体の既定は `permissions: {}`。新しいステップを足すときも、外部のコードやデータを扱う処理は `publish` に入れない。
 - 注意: 公開リポジトリで60日間活動がないと、定期実行のワークフローは GitHub により自動で無効化される（Actions 自身の push が活動に数えられるかは要確認）。止まったら Actions の画面で有効化し直す。
 
 ## 動作確認
